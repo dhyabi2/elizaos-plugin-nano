@@ -1,6 +1,5 @@
 // ElizaOS plugin: a Nano (XNO) wallet for your agent — feeless, instant, final payments + an x402 payer.
-// Targets @elizaos/core >= 0.1.7. The Action/Provider shape is intentionally conservative; verify the
-// handler signature against your Eliza version (the core API has shifted across 0.1.x).
+// Targets @elizaos/core 1.x (built and type-checked against 1.7.2).
 //
 // Settings (runtime.getSetting): NANO_SEED (64-hex, required to send/receive), NANO_RPC_URL
 // (default https://rpc.nano.to), NANO_INDEX (default 0), NANO_REP (optional representative).
@@ -8,12 +7,12 @@ import type { Plugin, Action, Provider, IAgentRuntime, Memory, State, HandlerCal
 import { accountFromSeed, getBalance, send, receive, type NanoConfig } from "./nano.js";
 
 function cfg(runtime: IAgentRuntime): NanoConfig {
-  const seed = runtime.getSetting("NANO_SEED") || "";
+  const str = (k: string) => { const v = runtime.getSetting(k); return v == null || v === true ? "" : String(v); };
   return {
-    rpcUrl: runtime.getSetting("NANO_RPC_URL") || "https://rpc.nano.to",
-    seed,
-    index: Number(runtime.getSetting("NANO_INDEX") || 0),
-    rep: runtime.getSetting("NANO_REP") || undefined,
+    rpcUrl: str("NANO_RPC_URL") || "https://rpc.nano.to",
+    seed: str("NANO_SEED"),
+    index: Number(str("NANO_INDEX") || 0),
+    rep: str("NANO_REP") || undefined,
   };
 }
 const hasSeed = (r: IAgentRuntime) => !!r.getSetting("NANO_SEED");
@@ -21,13 +20,15 @@ const num = (s: string) => (s.match(/-?\d+(\.\d+)?/) || [])[0];
 const addr = (s: string) => (s.match(/(nano|xrb)_[13][0-9a-z]{59}/) || [])[0];
 
 const walletProvider: Provider = {
+  name: "NANO_WALLET",
+  description: "The agent's Nano (XNO) address and balance.",
   get: async (runtime) => {
-    if (!hasSeed(runtime)) return "Nano wallet: not configured (set NANO_SEED to enable XNO payments).";
+    if (!hasSeed(runtime)) return { text: "Nano wallet: not configured (set NANO_SEED to enable XNO payments)." };
     try {
       const b = await getBalance(cfg(runtime));
-      return `Nano (XNO) wallet: ${b.address} — balance ${b.balanceXno} XNO${b.open ? "" : " (unopened; receive to open)"}. Payments are feeless and settle in under a second.`;
+      return { text: `Nano (XNO) wallet: ${b.address} — balance ${b.balanceXno} XNO${b.open ? "" : " (unopened; receive to open)"}. Payments are feeless and settle in under a second.` };
     } catch (e: any) {
-      return `Nano wallet: ${accountFromSeed(cfg(runtime).seed, cfg(runtime).index).address} (balance unavailable: ${e.message}).`;
+      return { text: `Nano wallet: ${accountFromSeed(cfg(runtime).seed, cfg(runtime).index).address} (balance unavailable: ${e.message}).` };
     }
   },
 };
@@ -40,16 +41,16 @@ const sendAction: Action = {
   handler: async (runtime, message, _state, _opts, callback?: HandlerCallback) => {
     const text = message.content.text || "";
     const to = addr(text); const amount = num(text);
-    if (!to || !amount) { callback?.({ text: "Tell me an amount and a nano_ address to send to." }); return false; }
+    if (!to || !amount) { callback?.({ text: "Tell me an amount and a nano_ address to send to." }); return { success: false }; }
     try {
       const r = await send(cfg(runtime), to, amount);
       callback?.({ text: `Sent ${r.amountXno} XNO to ${to}. Block ${r.hash} — feeless, final.`, content: r });
-      return true;
-    } catch (e: any) { callback?.({ text: `Could not send: ${e.message}` }); return false; }
+      return { success: true };
+    } catch (e: any) { callback?.({ text: `Could not send: ${e.message}` }); return { success: false }; }
   },
   examples: [[
-    { user: "{{user1}}", content: { text: "pay 0.01 XNO to nano_1yo6c1t64ahfjdw1dxizmbbnpdmbrckwhw9phbg5pdkeubrizga4qhnjmnx7" } },
-    { user: "{{agent}}", content: { text: "Sent 0.01 XNO. Block … — feeless, final.", action: "SEND_NANO" } },
+    { name: "{{user1}}", content: { text: "pay 0.01 XNO to nano_1yo6c1t64ahfjdw1dxizmbbnpdmbrckwhw9phbg5pdkeubrizga4qhnjmnx7" } },
+    { name: "{{agent}}", content: { text: "Sent 0.01 XNO. Block … — feeless, final.", actions: ["SEND_NANO"] } },
   ]],
 };
 
@@ -60,11 +61,11 @@ const balanceAction: Action = {
   validate: async (runtime) => hasSeed(runtime),
   handler: async (runtime, _m, _s, _o, callback?: HandlerCallback) => {
     try { const b = await getBalance(cfg(runtime));
-      callback?.({ text: `${b.balanceXno} XNO at ${b.address}${b.open ? "" : " (unopened)"}.`, content: b }); return true;
-    } catch (e: any) { callback?.({ text: `Balance unavailable: ${e.message}` }); return false; }
+      callback?.({ text: `${b.balanceXno} XNO at ${b.address}${b.open ? "" : " (unopened)"}.`, content: b }); return { success: true };
+    } catch (e: any) { callback?.({ text: `Balance unavailable: ${e.message}` }); return { success: false }; }
   },
-  examples: [[{ user: "{{user1}}", content: { text: "what's my XNO balance?" } },
-    { user: "{{agent}}", content: { text: "… XNO at nano_…", action: "CHECK_NANO_BALANCE" } }]],
+  examples: [[{ name: "{{user1}}", content: { text: "what's my XNO balance?" } },
+    { name: "{{agent}}", content: { text: "… XNO at nano_…", actions: ["CHECK_NANO_BALANCE"] } }]],
 };
 
 const receiveAction: Action = {
@@ -74,11 +75,11 @@ const receiveAction: Action = {
   validate: async (runtime) => hasSeed(runtime),
   handler: async (runtime, _m, _s, _o, callback?: HandlerCallback) => {
     try { const r = await receive(cfg(runtime));
-      callback?.({ text: r.received.length ? `Received ${r.received.length} block(s) into ${r.address}.` : `Nothing pending at ${r.address}.`, content: r }); return true;
-    } catch (e: any) { callback?.({ text: `Receive failed: ${e.message}` }); return false; }
+      callback?.({ text: r.received.length ? `Received ${r.received.length} block(s) into ${r.address}.` : `Nothing pending at ${r.address}.`, content: r }); return { success: true };
+    } catch (e: any) { callback?.({ text: `Receive failed: ${e.message}` }); return { success: false }; }
   },
-  examples: [[{ user: "{{user1}}", content: { text: "receive my pending nano" } },
-    { user: "{{agent}}", content: { text: "Received 1 block.", action: "RECEIVE_NANO" } }]],
+  examples: [[{ name: "{{user1}}", content: { text: "receive my pending nano" } },
+    { name: "{{agent}}", content: { text: "Received 1 block.", actions: ["RECEIVE_NANO"] } }]],
 };
 
 // Pay an x402 endpoint that settles in XNO: GET → 402 (amount + nano address) → send → retry with X-PAYMENT.
@@ -89,21 +90,21 @@ const payX402Action: Action = {
   validate: async (runtime, message) => hasSeed(runtime) && /https?:\/\//.test(message.content.text || ""),
   handler: async (runtime, message, _s, _o, callback?: HandlerCallback) => {
     const url = (message.content.text || "").match(/https?:\/\/\S+/)?.[0];
-    if (!url) { callback?.({ text: "Give me the endpoint URL to pay." }); return false; }
+    if (!url) { callback?.({ text: "Give me the endpoint URL to pay." }); return { success: false }; }
     try {
       let res = await fetch(url, { headers: { "User-Agent": "elizaos-plugin-nano" } });
-      if (res.status !== 402) { callback?.({ text: `No payment required (HTTP ${res.status}).`, content: { body: await res.text() } }); return true; }
+      if (res.status !== 402) { callback?.({ text: `No payment required (HTTP ${res.status}).`, content: { body: await res.text() } }); return { success: true }; }
       const quote = await res.json() as any;
       const to = addr(JSON.stringify(quote)); const amount = num(quote.message || quote.amount || "");
-      if (!to || !amount) { callback?.({ text: `402 returned but I could not read the XNO amount/address: ${JSON.stringify(quote).slice(0,200)}` }); return false; }
+      if (!to || !amount) { callback?.({ text: `402 returned but I could not read the XNO amount/address: ${JSON.stringify(quote).slice(0,200)}` }); return { success: false }; }
       const paid = await send(cfg(runtime), to, amount);
       res = await fetch(url, { headers: { "User-Agent": "elizaos-plugin-nano", "X-PAYMENT": paid.hash } });
       callback?.({ text: `Paid ${amount} XNO (block ${paid.hash}) and retried: HTTP ${res.status}.`, content: { paid, body: await res.text() } });
-      return true;
-    } catch (e: any) { callback?.({ text: `x402 pay failed: ${e.message}` }); return false; }
+      return { success: true };
+    } catch (e: any) { callback?.({ text: `x402 pay failed: ${e.message}` }); return { success: false }; }
   },
-  examples: [[{ user: "{{user1}}", content: { text: "buy the extract from https://extract.paypercall.dev/api/v1/extract" } },
-    { user: "{{agent}}", content: { text: "Paid 0.0001 XNO and got the result.", action: "PAY_X402_NANO" } }]],
+  examples: [[{ name: "{{user1}}", content: { text: "buy the extract from https://extract.paypercall.dev/api/v1/extract" } },
+    { name: "{{agent}}", content: { text: "Paid 0.0001 XNO and got the result.", actions: ["PAY_X402_NANO"] } }]],
 };
 
 export const nanoPlugin: Plugin = {

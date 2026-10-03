@@ -36,7 +36,7 @@ import { nanoPlugin } from "@dhyabi2/plugin-nano";
 A wallet **provider** also injects the agent's address + balance into context each turn.
 
 ## Status & honesty
-Reference plugin targeting `@elizaos/core >= 0.1.7`. Key derivation/signing uses the production-proven
+Built and type-checked against `@elizaos/core` 1.7.2 (peer range `>=1.0.0`). Key derivation/signing uses the production-proven
 `nanocurrency` path (`deriveSecretKey → derivePublicKey → deriveAddress`, local signing, only the signed block
 is relayed). The ElizaOS `Action`/`Provider` handler signature has shifted across 0.1.x — **verify against your
 version** before production. Work generation assumes your RPC has `work_generate` enabled (or supply work
