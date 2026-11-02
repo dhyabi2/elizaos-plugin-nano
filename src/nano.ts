@@ -1,6 +1,7 @@
 // Nano (XNO) helpers — pure key derivation + RPC, the same approach proven in production
 // (nanocurrency 2.5.x: deriveSecretKey(seed,0) -> derivePublicKey -> deriveAddress{useNanoPrefix}).
 // The seed never leaves the process; only the signed block is sent to the node.
+import { reserve, capsFrom } from "./caps.js";
 import {
   deriveSecretKey, derivePublicKey, deriveAddress, createBlock,
   checkSeed, checkAddress,
@@ -20,7 +21,7 @@ export function rawToXno(raw: string): string {
   return frac ? `${whole}.${frac}` : `${whole}`;
 }
 
-export interface NanoConfig { rpcUrl: string; seed: string; index?: number; rep?: string; }
+export interface NanoConfig { rpcUrl: string; seed: string; index?: number; rep?: string; maxSendXno?: string; maxDayXno?: string; }
 
 export function accountFromSeed(seed: string, index = 0) {
   if (!checkSeed(seed)) throw new Error("NANO_SEED is not a valid 64-hex seed");
@@ -56,6 +57,8 @@ export async function send(cfg: NanoConfig, to: string, amountXno: string) {
   const balance = BigInt(info.balance);
   const amountRaw = BigInt(xnoToRaw(amountXno));
   if (amountRaw > balance) throw new Error("insufficient balance");
+  const release = reserve(amountRaw, capsFrom(cfg.maxSendXno, cfg.maxDayXno)); // throws over a cap, before signing
+  try {
   const { block, hash } = createBlock(secret, {
     balance: (balance - amountRaw).toString(),
     representative: cfg.rep || info.representative,
@@ -64,7 +67,9 @@ export async function send(cfg: NanoConfig, to: string, amountXno: string) {
     work: undefined as any, // node computes work when work_generate is enabled; else supply it upstream
   });
   const res = await rpc(cfg.rpcUrl, { action: "process", json_block: "true", subtype: "send", block });
-  return { hash: res.hash || hash, to, amountXno };
+  if (!res.hash) throw new Error(`node did not accept the block: ${JSON.stringify(res).slice(0, 120)}`);
+  return { hash: res.hash, to, amountXno };
+  } catch (e) { release(); throw e; }
 }
 
 // Receive all pending blocks into the agent's account (opens it if needed).

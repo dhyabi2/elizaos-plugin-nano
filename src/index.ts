@@ -13,6 +13,8 @@ function cfg(runtime: IAgentRuntime): NanoConfig {
     seed: str("NANO_SEED"),
     index: Number(str("NANO_INDEX") || 0),
     rep: str("NANO_REP") || undefined,
+    maxSendXno: str("NANO_MAX_SEND_XNO") || undefined,
+    maxDayXno: str("NANO_MAX_DAY_XNO") || undefined,
   };
 }
 const hasSeed = (r: IAgentRuntime) => !!r.getSetting("NANO_SEED");

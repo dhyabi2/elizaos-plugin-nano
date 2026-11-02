@@ -10,19 +10,18 @@ micropayments are economic where fee-metered rails erode them.
 - **Add it beside USDC, not instead of it** — see the [dual-rail](https://github.com/dhyabi2/dual-rail) pattern.
 
 ## Install
-Not on the npm registry yet (`https://registry.npmjs.org/@dhyabi2%2Fplugin-nano` answers 404 as of 2026-11-02), so `npm install @dhyabi2/plugin-nano` does not work today. Build it from this repository (the `build` script is `tsup src/index.ts --format esm --dts --clean`):
+One command, from the git tag (no npm account needed; the package builds itself on install):
 ```bash
-git clone https://github.com/dhyabi2/elizaos-plugin-nano && cd elizaos-plugin-nano
-npm install && npm run build
-# then, in your agent project:
-npm install /path/to/elizaos-plugin-nano nanocurrency
+npm install github:dhyabi2/elizaos-plugin-nano#v0.1.1 nanocurrency
 ```
-Once the package is published the install is `npm install @dhyabi2/plugin-nano nanocurrency`.
+(`@dhyabi2/plugin-nano` is not on the npm registry yet, so `npm install @dhyabi2/plugin-nano` does not work today.)
 Add to your character/agent config and set:
 ```
 NANO_SEED      = <64-hex seed>        # required to send/receive; the seed never leaves the process
 NANO_RPC_URL   = https://rpc.nano.to  # any Nano RPC (send a User-Agent)
 NANO_INDEX     = 0                     # optional
+NANO_MAX_SEND_XNO = 0.1               # optional per-call cap (default 0.1); over it, SEND_NANO / PAY_X402_NANO refuse before signing
+NANO_MAX_DAY_XNO  = 1                 # optional per-UTC-day cap (default 1; held in process memory)
 NANO_REP       = nano_...              # optional representative
 ```
 ```ts
@@ -39,6 +38,9 @@ import { nanoPlugin } from "@dhyabi2/plugin-nano";
 | `PAY_X402_NANO` | call an x402 endpoint priced in XNO: 402 → pay → retry (e.g. `extract.paypercall.dev`) |
 
 A wallet **provider** also injects the agent's address + balance into context each turn.
+
+## Spend caps
+A chat message containing a `nano_` address triggers `SEND_NANO`, so every send passes `src/caps.ts` first: a per-call and a per-day cap, enforced in code before anything is signed. Tests: `npm test` (5 pass).
 
 ## Status & honesty
 Built and type-checked against `@elizaos/core` 1.7.2 (peer range `>=1.0.0`). Key derivation/signing uses the production-proven

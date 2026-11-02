@@ -1,16 +1,49 @@
 {
   "name": "@dhyabi2/plugin-nano",
-  "version": "0.1.0",
-  "description": "ElizaOS plugin: give an agent a Nano (XNO) wallet — feeless, instant, final payments and an x402 payer.",
+  "version": "0.1.1",
+  "description": "ElizaOS plugin: give an agent a Nano (XNO) wallet \u2014 feeless, instant, final payments and an x402 payer.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "exports": { ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" } },
-  "files": ["dist", "src", "README.md"],
-  "scripts": { "build": "tsup src/index.ts --format esm --dts --clean" },
-  "keywords": ["elizaos", "eliza-plugin", "nano", "xno", "payments", "x402", "agent-payments", "micropayments"],
-  "peerDependencies": { "@elizaos/core": ">=1.0.0" },
-  "dependencies": { "nanocurrency": "^2.5.0" },
-  "devDependencies": { "tsup": "^8.0.0", "typescript": "^5.4.0" },
-  "license": "MIT"
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts src/nano.ts src/caps.ts --format esm --dts --clean",
+    "prepare": "npm run build",
+    "test": "npm run build && node --test test/*.test.mjs"
+  },
+  "keywords": [
+    "elizaos",
+    "eliza-plugin",
+    "nano",
+    "xno",
+    "payments",
+    "x402",
+    "agent-payments",
+    "micropayments"
+  ],
+  "peerDependencies": {
+    "@elizaos/core": ">=1.0.0"
+  },
+  "dependencies": {
+    "nanocurrency": "^2.5.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dhyabi2/elizaos-plugin-nano.git"
+  }
 }
