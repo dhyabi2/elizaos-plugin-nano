@@ -10,9 +10,14 @@ micropayments are economic where fee-metered rails erode them.
 - **Add it beside USDC, not instead of it** — see the [dual-rail](https://github.com/dhyabi2/dual-rail) pattern.
 
 ## Install
+Not on the npm registry yet (`https://registry.npmjs.org/@dhyabi2%2Fplugin-nano` answers 404 as of 2026-11-02), so `npm install @dhyabi2/plugin-nano` does not work today. Build it from this repository (the `build` script is `tsup src/index.ts --format esm --dts --clean`):
 ```bash
-npm install @dhyabi2/plugin-nano nanocurrency
+git clone https://github.com/dhyabi2/elizaos-plugin-nano && cd elizaos-plugin-nano
+npm install && npm run build
+# then, in your agent project:
+npm install /path/to/elizaos-plugin-nano nanocurrency
 ```
+Once the package is published the install is `npm install @dhyabi2/plugin-nano nanocurrency`.
 Add to your character/agent config and set:
 ```
 NANO_SEED      = <64-hex seed>        # required to send/receive; the seed never leaves the process
